@@ -8,11 +8,12 @@ class MprpcApplication
 public:
     static void Init(int argc,char** argv);
     static MprpcApplication& GetInstance();
+    static MprpcConfig& GetConfig();
 private:
     //普通成员变量不能在静态方法中
     inline static MprpcConfig m_config;
 
-    MprpcApplication();
+    MprpcApplication() = default;
     MprpcApplication(const MprpcApplication&) = delete;
     MprpcApplication(MprpcApplication&&) = delete;
 };
