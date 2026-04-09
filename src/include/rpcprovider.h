@@ -2,6 +2,7 @@
 #include "google/protobuf/service.h"
 
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/message.h>
 #include <muduo/net/Callbacks.h>
 #include <muduo/net/TcpServer.h>
 #include <muduo/net/EventLoop.h>
@@ -42,4 +43,7 @@ private:
     void OnMessage(const muduo::net::TcpConnectionPtr&,
                             muduo::net::Buffer*,
                             muduo::Timestamp);
+
+    // Closure的回调操作，用于序列化rpc的响应和网络发送
+    void SendRpcResponse(const muduo::net::TcpConnectionPtr&,google::protobuf::Message*);
 };
