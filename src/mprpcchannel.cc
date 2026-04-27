@@ -1,13 +1,18 @@
 #include "mprpcchannel.h"
 #include "rpcheader.pb.h"
+#include "mprpcapplication.h"
 
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>
 #include <google/protobuf/descriptor.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
+#include <unistd.h>
 
 /*
 header_size + service_name method_name args_size + args
@@ -56,7 +61,7 @@ void MprpcChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
 
     // 组织待发送的rpc请求的字符串
     std::string send_rpc_str;
-    send_rpc_str.insert(0,std::string((char*)&header_size),4); // header_size
+    send_rpc_str.append((char*)&header_size,4); // header_size
     send_rpc_str += rpc_header_str; // rpcheader
     send_rpc_str += args_str; // args
 
@@ -76,4 +81,59 @@ void MprpcChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
         std::cout << "create socket error! errno:" << errno << std::endl;
         exit(EXIT_FAILURE);
     }
+
+    // 读取配置文件rpcserver的信息
+    std::string ip = MprpcApplication::GetInstance().GetConfig().Load("rpcserverip");
+    uint16_t port = atoi(MprpcApplication::GetInstance().GetConfig().Load("rpcserverport").c_str());
+
+    struct sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    server_addr.sin_addr.s_addr = inet_addr(ip.c_str());
+
+    // 连接rpc服务节点
+    if(-1 == connect(clientfd, (struct sockaddr*)&server_addr, sizeof(server_addr)))
+    {
+        std::cout << "connect socket error! errno:" << errno << std::endl;
+        close(clientfd);
+        exit(EXIT_FAILURE);
+    }
+
+    // 发送rpc请求
+    if(-1 == send(clientfd,send_rpc_str.c_str(),send_rpc_str.size(),0))
+    {
+        std::cout << "send error! errno:" << errno << std::endl;
+        close(clientfd);
+        return;
+    }
+
+    // 接收rpc请求的相应值
+    char recv_buf[1024] = {0};
+    int recv_size = 0;
+    if(-1 == (recv_size = recv(clientfd, recv_buf, 1024, 0)))
+    {
+        std::cout << "recv error! errno:" << errno << std::endl;
+        close(clientfd);
+        return;
+    }
+
+    std::cout << "DEBUG: recv_size=" << recv_size << std::endl;
+    std::cout << "DEBUG: recv_buf content (hex):";
+    for(int i = 0; i < recv_size && i < 50; i++)
+    {
+        printf(" %02x", (unsigned char)recv_buf[i]);
+    }
+    std::cout << std::endl;
+
+    // 反序列化rpc调用的相应数据
+    std::string response_str(recv_buf, recv_size);
+    std::cout << "DEBUG: response_str size=" << response_str.size() << std::endl;
+    if(!response->ParseFromString(response_str))
+    {
+        std::cout << "parse error! response_str:" << response_str << std::endl;
+        close(clientfd);
+        return;
+    }
+
+    close(clientfd);
 }
