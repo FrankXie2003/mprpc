@@ -25,6 +25,6 @@ include_directories(${Protobuf_INCLUDE_DIRS})
 # 添加子目录
 # src包含了mprpc框架的源代码
 add_subdirectory(src)
-# add_subdirectory(test)
+add_subdirectory(test)
 # example包含了mprpc框架是用的示例代码
 add_subdirectory(example)
